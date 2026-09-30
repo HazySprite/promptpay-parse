@@ -2,7 +2,7 @@
   "name": "promptpay-parse",
   "version": "1.0.1",
   "description": "Zero-dependency TypeScript library for PromptPay & EMVCo QR Codes — parse, generate and validate. Works in Node.js, Next.js, Nuxt and browsers.",
-  "author": "hazysprite",
+  "author": "HazySprite",
   "license": "MIT",
   "keywords": [
     "emvco",
@@ -18,10 +18,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hazysprite/promptpay-parse.git"
+    "url": "git+https://github.com/HazySprite/promptpay-parse.git"
   },
   "bugs": {
-    "url": "https://github.com/hazysprite/promptpay-parse/issues"
+    "url": "https://github.com/HazySprite/promptpay-parse/issues"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
