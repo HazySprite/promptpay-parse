@@ -12,3 +12,4 @@ package-lock.json.bak
 
 # local asset workspace
 output/
+.omx/

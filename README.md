@@ -2,258 +2,330 @@
 
 # promptpay-parse
 
-Zero-dependency TypeScript library for **PromptPay & EMVCo QR Codes** — parse, manipulate, generate, detect and render.
+[ภาษาไทย](docs/README.th.md) · [npm](https://www.npmjs.com/package/promptpay-parse)
 
-Implemented directly from the [EMVCo QR Code](https://www.emvco.com/emv-technologies/qrcodes/) and [BOT Thai QR Payment](https://www.bot.or.th) specifications.
+**Generate PromptPay QR payloads and read payment QR data in JavaScript or TypeScript.** Build a payment QR, read a scanned payload, change its amount, or extract transaction references from a slip.
 
-## Features
-
-- **Parse** — PromptPay / EMVCo QR data strings into a typed tag object, with typed extraction of all well-known EMVCo MPM fields (merchant name, city, MCC, additional data, …)
-- **Manipulate** — edit any parsed QR (`withTag`, `withoutTag`, `setAmount`) and get a re-encoded payload with a freshly computed CRC
-- **Generate** — QR payloads from templates: PromptPay AnyID, Bill Payment, Slip Verify (Mini-QR), TrueMoney, TrueMoney Slip Verify, BOT Barcode
-- **Detect** — one call that classifies any scanned payload (AnyID / Bill Payment / TrueMoney / Slip Verify / BCEL OneProof / BOT Barcode / generic EMV) and extracts its data
-- **Validate** — CRC-16 checksum and per-format structure checks
-- **Render** (optional) — QR as a self-contained SVG with logo and Thai caption support
-- **Zero dependencies** — single build, no runtime installs (the optional `./render` entry uses `qrcode` as an optional peer dependency)
+- **No runtime dependencies in the core.** Install `qrcode` only when you need image rendering.
+- **Typed data.** Read recipient details, amounts, merchant fields, and references without decoding tags yourself.
+- **Multiple payment formats.** PromptPay, TrueMoney, Slip Verify, BOT Barcode, and generic EMVCo QR data in one toolkit.
 
 ## Install
 
 ```sh
 npm install promptpay-parse
-# optional, only for image rendering:
-npm install promptpay-parse qrcode
 ```
 
-## Usage
+Node.js 18+; ESM and CommonJS exports are included. A [browser global](#browser-global) is also available.
 
-### Parse a QR payload and read tags
+## Quick start
 
-```ts
-import { parse } from 'promptpay-parse'
-
-const qr = parse('00020101021129370016A0000006770101110113006681222333353037645802TH63041DCF')
-// or with an options object: parse(payload, { strict: true, subTags: true })
-
-qr?.getTagValue('00') // '01'
-qr?.getTagValue('29', '01') // sub-tag of Tag 29
-qr?.isValid('63') // true — CRC re-verified
-qr?.crcTagId // '63'
-```
-
-### Read typed EMVCo fields
+Create a PromptPay payload for a mobile number with a ฿30 payment amount:
 
 ```ts
-qr?.fields.merchantName // 'ร้านทดสอบ'
-qr?.fields.merchantCity // 'กรุงเทพ'
-qr?.fields.merchantCategoryCode // '5812'
-qr?.fields.pointOfInitiation // 'static' | 'dynamic'
-qr?.fields.amount // number | undefined
-qr?.fields.additionalData // { billNumber?: string, purpose?: string, ... }
-qr?.fields.merchantAccountInfo // Tags 26–51 with AIDs and sub-tags
-qr?.fields.unreservedTemplates // Tags 65–99
-```
+import { generate, validate } from 'promptpay-parse'
 
-### Manipulate a parsed QR
-
-Every manipulation returns a **new** `EmvQr`; the original is untouched and the CRC tag is recomputed automatically.
-
-```ts
-import { parse } from 'promptpay-parse'
-
-const qr = parse('0002010102112937…63041DCF')!
-
-// Bake an amount into a static QR (flips Tag 01 to dynamic)
-const withAmount = qr.setAmount(250)
-
-// Remove it again
-const staticAgain = withAmount.setAmount(undefined)
-
-// Generic tag editing, chainable
-const edited = qr.withTag('59', 'My Shop').withoutTag('53')
-
-edited.getPayload() // re-encoded payload with a fresh CRC
-edited.isValid('63') // true
-```
-
-### Detect the format of any scanned payload
-
-```ts
-import { detect } from 'promptpay-parse'
-
-const result = detect(scannedString)
-
-switch (result.format) {
-  case 'anyId':
-    result.type // 'MSISDN'
-    result.target // '0812223333'
-    result.amount
-    result.additionalData // Tag 62 fields when present
-    break
-  case 'billPayment':
-    result.billerId
-    result.ref1
-    break
-  case 'trueMoney':
-    result.mobileNo
-    result.message
-    break
-  case 'slipVerify':
-    result.sendingBank
-    result.transRef
-    break
-  case 'trueMoneySlipVerify':
-  case 'bcelOneProof':
-  case 'botBarcode':
-  case 'emv': // generic EMVCo payload
-  case 'unknown':
-}
-```
-
-Classification is structural, so tampered payloads are still classified — combine with `validate.*` or `qr.isValid()` when checksum integrity matters.
-
-### Build raw TLV data
-
-```ts
-import { encode, tag, withCrcTag } from 'promptpay-parse'
-
-const payload = encode([tag('00', '01'), tag('01', '11')])
-withCrcTag(payload, '63') // appends Tag 63 + CRC-16 checksum
-```
-
-### Generate QR payloads
-
-```ts
-import { generate } from 'promptpay-parse'
-// or deep import: import { anyId } from 'promptpay-parse/generate'
-
-// PromptPay AnyID — mobile / National ID / e-Wallet, with optional Tag 62 data
-const anyIdPayload = generate.anyId({
+const payload = generate.anyId({
   type: 'MSISDN',
   target: '0812223333',
   amount: 30,
-  additionalData: { billNumber: 'INV-2026-0001', purpose: 'Lunch' },
 })
 
-// PromptPay Bill Payment (Tag 30)
-const billPayload = generate.billPayment({
+console.log(payload) // The string to encode as a QR image
+console.log(validate.anyId(payload))
+// { type: 'MSISDN', target: '0812223333', amount: 30 }
+```
+
+Generators return a **payload string**. Use [the SVG renderer](#render-a-qr-image) to turn it into an image. Omit `amount` to let the payer enter the amount in their banking app. Use your own PromptPay-registered number when accepting payments.
+
+## Choose your task
+
+| I want to…                                          | Start with                                             |
+| --------------------------------------------------- | ------------------------------------------------------ |
+| Create a PromptPay payment QR                       | [`generate.anyId`](#quick-start)                       |
+| Display a QR with a Thai caption or logo            | [`renderSvg`](#render-a-qr-image)                      |
+| Read a scanned QR and identify its format           | [`parse` / `detect`](#read-a-scanned-qr)               |
+| Set an amount or edit an existing QR                | [`setAmount` / `withTag`](#change-a-qr-amount)         |
+| Extract bank and transaction references from a slip | [`validate.slipVerify`](#extract-payment-slip-details) |
+| Work with Bill Payment, TrueMoney, or BOT Barcode   | [More payment formats](#more-payment-formats)          |
+
+## Usage
+
+### Render a QR image
+
+Install the optional rendering dependency:
+
+```sh
+npm install promptpay-parse qrcode
+```
+
+```ts
+import { generate } from 'promptpay-parse'
+import { renderSvg } from 'promptpay-parse/render'
+
+const { svg } = renderSvg({
+  payload: generate.anyId({ type: 'MSISDN', target: '0812223333', amount: 30 }),
+  size: 420,
+  caption: { title: 'ร้านกาแฟบ้านสวน', amount: '฿30.00', subtitle: 'พร้อมเพย์' },
+})
+
+console.log(svg) // SVG markup ready to display or save as an .svg file
+```
+
+`renderSvg` works in Node.js and browsers. For a logo, pass `logo` with an image `href` (use a data URI for a self-contained SVG) and `sizeRatio`, such as `0.22`. A logo forces error correction level `H`; ratios must be greater than `0` and at most `0.3`, otherwise the renderer throws `RangeError`.
+
+For PNG output, see [browser PNG download](#browser-png-download).
+
+### Read a scanned QR
+
+Pass the **decoded text** from your QR scanner. The library reads payload strings; image scanning happens in your app.
+
+```ts
+import { detect, parse } from 'promptpay-parse'
+
+const scannedPayload =
+  '00020101021229370016A0000006770101110113006680111111153037645802TH540520.15630442BE'
+
+const qr = parse(scannedPayload, { strict: true })
+if (!qr) throw new Error('Invalid QR payload or checksum')
+
+console.log(qr.fields.amount) // 20.15
+
+const result = detect(scannedPayload)
+if (result.format === 'anyId') {
+  console.log(result.target) // '0801111111'
+  console.log(result.amount) // 20.15
+}
+```
+
+`parse` returns `EmvQr` or `null`. It decodes nested tags by default; `{ strict: true }` also checks the CRC checksum. `detect` classifies by structure, so use strict parsing or a format validator when you also need checksum validation.
+
+Detection returns a typed union with these formats: `anyId`, `billPayment`, `trueMoney`, `slipVerify`, `trueMoneySlipVerify`, `bcelOneProof`, `botBarcode`, `emv`, and `unknown`. Switch on `result.format` to access each format's fields.
+
+### Change a QR amount
+
+```ts
+import { generate, parse } from 'promptpay-parse'
+
+const payload = generate.anyId({ type: 'MSISDN', target: '0812223333' })
+const qr = parse(payload, { strict: true })
+if (!qr) throw new Error('Invalid QR payload')
+
+const updated = qr.setAmount(250).withTag('59', 'My Shop')
+
+console.log(updated.fields.amount) // 250
+console.log(updated.fields.merchantName) // 'My Shop'
+console.log(updated.isValid('63')) // true
+console.log(updated.getPayload()) // New payload with a recomputed CRC
+
+const withoutAmount = updated.setAmount(undefined)
+console.log(withoutAmount.fields.pointOfInitiation) // 'static'
+console.log(qr.fields.amount) // undefined — the original is unchanged
+```
+
+Edits return a **new `EmvQr`** and recompute its CRC. `setAmount` also updates the static/dynamic flag. Use `withTag` and `withoutTag` for other tag edits.
+
+### Extract payment slip details
+
+Read the Mini-QR payload from a payment slip:
+
+```ts
+import { validate } from 'promptpay-parse'
+
+const slipPayload = '004100060000010103014022000111222233344ABCD125102TH910417DF'
+const slip = validate.slipVerify(slipPayload)
+
+if (slip) {
+  console.log(slip.sendingBank) // '014'
+  console.log(slip.transRef) // '00111222233344ABCD12'
+}
+```
+
+The validator checks the payload's structure and checksum and returns the bank code and transaction reference, or `null`. To confirm a payment, send those details to your bank's transaction inquiry API. Checksum validation alone does not confirm that money was transferred.
+
+`validate.slipVerify` also restores leading zeros in truncated CRCs by default; pass `false` as its second argument to disable this repair.
+
+### More payment formats
+
+```ts
+import { generate, parseBarcode, validate } from 'promptpay-parse'
+
+const bill = generate.billPayment({
   billerId: '0112233445566',
   ref1: 'INV12345',
   ref2: 'INV001',
   ref3: 'SCB',
-  amount: 300.0,
+  amount: 300,
 })
+console.log(validate.billPayment(bill))
+// { billerId: '0112233445566', ref1: 'INV12345', ref2: 'INV001', ref3: 'SCB', amount: 300 }
 
-// TrueMoney Wallet (supports Tag 81 personal message)
-const tmPayload = generate.trueMoney({ mobileNo: '0801111111', amount: 10.05, message: 'Hello' })
+const wallet = generate.trueMoney({ mobileNo: '0801111111', amount: 10.05, message: 'Hello' })
+console.log(wallet) // TrueMoney Wallet payload with a personal message
 
-// Slip Verify "Mini-QR" from a payment slip
-const slipPayload = generate.slipVerify({ sendingBank: '014', transRef: '0002123123121200011' })
+const walletSlip = generate.trueMoneySlipVerify({
+  eventType: 'P2P',
+  transactionId: 'TM1234567890',
+  date: '30092026',
+})
+console.log(validate.trueMoneySlipVerify(walletSlip))
+// { eventType: 'P2P', transactionId: 'TM1234567890', date: '30092026' }
 
-// BOT Barcode (|billerId\rref1\rref2\ramount)
 const barcode = generate.botBarcode({
   billerId: '099400016550100',
   ref1: '123456789012',
   amount: 3649.22,
 })
+console.log(parseBarcode(barcode)?.toQrTag30()) // Convert to a Bill Payment QR payload
 ```
 
-Feed the payload string into any QR Code image library (e.g. `qrcode`) to render the image — or use the built-in renderer below.
+AnyID also supports `NATID` (national/tax ID) and `EWALLETID`. `BANKACC` is a reserved proxy type. BCEL OneProof payloads can be classified with `detect` and checked with `validate.bcelOneProof`.
 
-### Validate & extract
+## Advanced usage
+
+<details>
+<summary>Read typed fields and raw tags</summary>
 
 ```ts
-import { parseBarcode, validate } from 'promptpay-parse'
-// or deep import: import { slipVerify } from 'promptpay-parse/validate'
+import { generate, parse } from 'promptpay-parse'
 
-const slip = validate.slipVerify('004100060000010103014022000111222233344ABCD125102TH910417DF')
-if (slip) {
-  await bankApi.inquire(slip.sendingBank, slip.transRef)
-}
+const payload = generate.anyId({
+  type: 'MSISDN',
+  target: '0812223333',
+  additionalData: { billNumber: 'INV-2026-0001', purpose: 'Lunch' },
+})
+const qr = parse(payload, { strict: true })
+if (!qr) throw new Error('Invalid QR payload')
 
-validate.anyId(anyIdPayload) // { type: 'MSISDN', target: '0812223333', amount: 30, additionalData? }
-validate.billPayment(billPayload) // { billerId, ref1, ref2?, ref3?, amount? }
-validate.trueMoneySlipVerify(tmSlipPayload) // { eventType, transactionId, date }
+const merchantQr = qr.withTag('52', '5812').withTag('59', 'ร้านทดสอบ').withTag('60', 'กรุงเทพ')
 
-// BOT Barcode → PromptPay Bill Payment QR (Tag 30)
-parseBarcode('|099999999999990\r111222333444\r\r0')?.toQrTag30()
+console.log(merchantQr.fields.merchantName) // 'ร้านทดสอบ'
+console.log(merchantQr.fields.merchantCity) // 'กรุงเทพ'
+console.log(merchantQr.fields.merchantCategoryCode) // '5812'
+console.log(qr.fields.additionalData) // { billNumber: 'INV-2026-0001', purpose: 'Lunch' }
+console.log(qr.getTagValue('29', '01')) // '0066812223333'
 ```
 
-### Render an image (optional `qrcode` peer dependency)
+`fields` also exposes `pointOfInitiation`, `amount`, `merchantAccountInfo` (Tags 26–51), and `unreservedTemplates` (Tags 65–99). Optional fields are `undefined` when absent. Pass `{ subTags: false }` to `parse` to skip nested tag decoding; positional `parse(payload, strict?, subTags?)` remains supported.
+
+</details>
+
+<details>
+<summary>Build raw TLV data</summary>
+
+```ts
+import { encode, tag, withCrcTag } from 'promptpay-parse'
+
+const data = encode([tag('00', '01'), tag('01', '11')])
+console.log(withCrcTag(data, '63')) // '0002010102116304AD0A'
+```
+
+`tag` and `encode` reject values that exceed the two-digit length field. `crc16` computes CRC-16/CCITT-FALSE over UTF-8 bytes and returns four uppercase hex digits.
+
+</details>
+
+### Browser PNG download
+
+<details>
+<summary>Download a PNG from a browser app</summary>
+
+Install `qrcode` as shown in [Render a QR image](#render-a-qr-image), then run this in your browser app's module:
 
 ```ts
 import { generate } from 'promptpay-parse'
-import { renderSvg, downloadPng } from 'promptpay-parse/render'
+import { downloadPng, renderSvg } from 'promptpay-parse/render'
 
-const { svg, errorCorrectionLevel } = renderSvg({
-  payload: generate.billPayment({ billerId: '0112233445566', ref1: 'INV12345', amount: 250 }),
-  size: 420,
-  logo: { href: logoDataUri, sizeRatio: 0.22 },
-  caption: { title: 'ร้านกาแฟบ้านสวน', amount: '฿250.00', subtitle: 'พร้อมเพย์' },
+const { svg } = renderSvg({
+  payload: generate.anyId({ type: 'MSISDN', target: '0812223333', amount: 30 }),
+  caption: { title: 'ร้านกาแฟบ้านสวน', amount: '฿30.00' },
 })
 
-// browser: rasterise through the platform canvas and download
-await downloadPng(svg, 'promptpay-250.png', { scale: 3 })
+await downloadPng(svg, 'promptpay-30.png', { scale: 3 })
 ```
 
-A logo spends the QR's error-correction budget on one contiguous block, so the renderer **forces level `H` whenever a logo is present** and throws `RangeError` above a `0.3` size ratio. `svgToPngDataUrl` returns the data URL without downloading; on the server rasterise the SVG with `@resvg/resvg-js`.
+`downloadPng` and `svgToPngDataUrl` require a browser DOM and canvas. `svgToPngDataUrl` returns a PNG data URL instead of downloading. Server PNG conversion requires a separate SVG rasterizer.
 
-### Browser global (CDN)
+</details>
+
+### Browser global
+
+<details>
+<summary>Use a script tag or CommonJS</summary>
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/promptpay-parse/dist/index.global.js"></script>
-
 <script>
-  const payload = PromptPayParse.generate.trueMoney({ mobileNo: '08xxxxxxxx', amount: 10 })
+  const payload = PromptPayParse.generate.anyId({
+    type: 'MSISDN',
+    target: '0812223333',
+    amount: 30,
+  })
+  console.log(PromptPayParse.validate.anyId(payload))
 </script>
 ```
 
-The same `dist/index.global.js` file is attached to every [GitHub Release](../../releases) — download it and serve it yourself if you don't use a CDN.
+You can also download `dist/index.global.js` from [GitHub Releases](https://github.com/HazySprite/promptpay-parse/releases) and serve it yourself. Core exports are available under `PromptPayParse`; the optional renderer uses the separate `promptpay-parse/render` entry.
 
-## API
+For CommonJS:
 
-| Export                                                                                     | Description                                                                                                                                                           |
-| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `parse(payload, options?)`                                                                 | Parse EMVCo QR → `EmvQr` or `null`. Options: `{ strict?, subTags? }` (positional `parse(payload, strict?, subTags?)` still works)                                     |
-| `EmvQr`                                                                                    | `getTag`, `getTagValue`, `getTags`, `getPayload`, `fields`, `crcTagId`, `isValid`, `withTag`, `withoutTag`, `setAmount`                                               |
-| `detect(payload)`                                                                          | Classify any payload → discriminated union (`anyId`, `billPayment`, `trueMoney`, `slipVerify`, `trueMoneySlipVerify`, `bcelOneProof`, `botBarcode`, `emv`, `unknown`) |
-| `generate.anyId / billPayment / slipVerify / trueMoney / trueMoneySlipVerify / botBarcode` | Payload generators                                                                                                                                                    |
-| `validate.anyId / billPayment / slipVerify / trueMoneySlipVerify / bcelOneProof`           | Format validators & extractors                                                                                                                                        |
-| `encodeAdditionalData / extractAdditionalData / ADDITIONAL_DATA_TAGS`                      | EMVCo Tag 62 additional data helpers                                                                                                                                  |
-| `encodeTag81 / decodeTag81`                                                                | TrueMoney Tag 81 personal message codec                                                                                                                               |
-| `crc16(data)`                                                                              | CRC-16/CCITT-FALSE over UTF-8 bytes, 4-digit uppercase hex                                                                                                            |
-| `decode / encode / tag / withCrcTag / getTag`                                              | Raw TLV utilities (`tag` and `encode` reject values that exceed the 2-digit length field)                                                                             |
-| `ProxyType`                                                                                | AnyID proxy type map (`MSISDN`, `NATID`, `EWALLETID`, `BANKACC`)                                                                                                      |
-| `renderSvg / downloadPng / svgToPngDataUrl`                                                | QR image rendering — `import from 'promptpay-parse/render'`, requires `qrcode`                                                                                        |
+```js
+const { generate, validate } = require('promptpay-parse')
 
-อ่านเอกสารภาษาไทยได้ที่ [docs/README.th.md](docs/README.th.md)
+const payload = generate.anyId({ type: 'MSISDN', target: '0812223333', amount: 30 })
+console.log(validate.anyId(payload))
+// { type: 'MSISDN', target: '0812223333', amount: 30 }
+```
+
+</details>
+
+## API reference
+
+| Export                                                                    | Purpose                                                                                                                 |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `parse` / `parseBarcode`                                                  | Parse EMVCo QR or BOT Barcode data; return an object or `null`                                                          |
+| `EmvQr`                                                                   | `fields`, `getTag`, `getTagValue`, `getTags`, `getPayload`, `crcTagId`, `isValid`, `withTag`, `withoutTag`, `setAmount` |
+| `detect`                                                                  | Classify a payload and extract data as a discriminated union                                                            |
+| `generate.*`                                                              | `anyId`, `billPayment`, `slipVerify`, `trueMoney`, `trueMoneySlipVerify`, `botBarcode`                                  |
+| `validate.*`                                                              | `anyId`, `billPayment`, `slipVerify`, `trueMoneySlipVerify`, `bcelOneProof`; return extracted data or `null`            |
+| `generate.ProxyType`                                                      | AnyID proxy map: `MSISDN`, `NATID`, `EWALLETID`, `BANKACC`                                                              |
+| `encodeAdditionalData` / `extractAdditionalData` / `ADDITIONAL_DATA_TAGS` | EMVCo Tag 62 helpers                                                                                                    |
+| `encodeTag81` / `decodeTag81`                                             | TrueMoney personal message codec                                                                                        |
+| `crc16` / `decode` / `encode` / `tag` / `withCrcTag` / `getTag`           | CRC and raw TLV utilities                                                                                               |
+| `renderSvg` / `downloadPng` / `svgToPngDataUrl`                           | From `promptpay-parse/render`; requires `qrcode`                                                                        |
+
+Generators and validators also have direct imports: `import { anyId, ProxyType } from 'promptpay-parse/generate'` and `import { slipVerify } from 'promptpay-parse/validate'`.
 
 ## Development
 
 ```sh
-npm test          # run the test suite
-npm run coverage  # tests with V8 coverage report
-npm run lint      # prettier --check + eslint
-npm run format    # prettier --write + eslint --fix
-npm run typecheck # tsc --noEmit
-npm run build     # emit dist/ (esm, cjs, iife + types)
+npm ci
+npm test          # run tests
+npm run coverage  # tests with V8 coverage
+npm run lint      # Prettier + ESLint
+npm run typecheck # TypeScript checks
+npm run build     # ESM, CommonJS, browser global, and types
+npm run format    # format and fix lint issues
 ```
 
-Every push/PR runs the full pipeline (typecheck → lint → coverage → build) on Node 20/22 plus Bun and Deno jobs.
+[CI](.github/workflows/ci.yml) runs typecheck, lint, coverage, and build on Node 20/22, with separate test jobs for Bun and Deno.
 
-## Versioning & release flow
+<details>
+<summary>Versioning and releases (maintainers)</summary>
 
-Semver (`MAJOR.MINOR.PATCH`). To cut a release:
+Releases follow semver (`MAJOR.MINOR.PATCH`):
 
 ```sh
-npm version patch   # or minor / major
+npm version patch # or minor / major
 git push --follow-tags
 ```
 
-Pushing a `v*` tag triggers `.github/workflows/publish.yml`: install → typecheck → lint → build → test → `npm publish --provenance` → GitHub Release with `dist/index.global.js` attached. Requires the `NPM_TOKEN` secret in the repository settings.
+A `v*` tag triggers the [publish workflow](.github/workflows/publish.yml), which checks the tag against the package version, runs verification, publishes to npm with provenance, and creates a GitHub Release with `dist/index.global.js`. Publishing uses the repository's `NPM_TOKEN` secret.
+
+</details>
 
 ## References
 
-- [EMV QR Code Specification](https://www.emvco.com/emv-technologies/qrcodes/)
+- [EMVCo QR Code specification](https://www.emvco.com/emv-technologies/qrcodes/)
 - [Thai QR Payment Standard (BOT)](https://www.bot.or.th/content/dam/bot/fipcs/documents/FPG/2562/ThaiPDF/25620084.pdf)
 - [Slip Verify API Mini QR Data](https://developer.scb/assets/documents/documentation/qr-payment/extracting-data-from-mini-qr.pdf)
 - [BOT Barcode Standard](https://www.bot.or.th/content/dam/bot/documents/th/our-roles/payment-systems/about-payment-systems/Std_Barcode.pdf)
