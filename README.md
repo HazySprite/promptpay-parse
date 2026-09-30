@@ -1,6 +1,6 @@
 # promptpay-parse
 
-Zero-dependency TypeScript library for **PromptPay & EMVCo QR Codes** — parse, generate and validate. Works in **Node.js (18+), Next.js, Nuxt, Deno, Bun and browsers**.
+Zero-dependency TypeScript library for **PromptPay & EMVCo QR Codes** — parse, generate and validate.
 
 Implemented directly from the [EMVCo QR Code](https://www.emvco.com/emv-technologies/qrcodes/) and [BOT Thai QR Payment](https://www.bot.or.th) specifications.
 
