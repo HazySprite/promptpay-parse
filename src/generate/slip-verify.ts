@@ -19,14 +19,7 @@ export interface SlipVerifyConfig {
  */
 export function slipVerify({ sendingBank, transRef }: SlipVerifyConfig): string {
   const payload = [
-    tag(
-      '00',
-      encode([
-        tag('00', '000001'),
-        tag('01', sendingBank),
-        tag('02', transRef),
-      ]),
-    ),
+    tag('00', encode([tag('00', '000001'), tag('01', sendingBank), tag('02', transRef)])),
     tag('51', COUNTRY_TH),
   ]
 

@@ -35,6 +35,7 @@ export function decode(payload: string): TlvTag[] {
     if (!LENGTH_FIELD.test(id) || !LENGTH_FIELD.test(rawLength)) break
 
     const length = Number(rawLength)
+    if (offset + 4 + length > payload.length) break
     const value = payload.slice(offset + 4, offset + 4 + length)
 
     tags.push({ id, value, length })
@@ -57,6 +58,9 @@ export function encode(tags: TlvTag[]): string {
   let payload = ''
 
   for (const t of tags) {
+    if (t.length > 99) {
+      throw new RangeError(`TLV tag ${t.id} exceeds the 2-digit length field (${t.length} > 99)`)
+    }
     payload += t.id
     payload += String(t.length).padStart(2, '0')
     payload += t.subTags ? encode(t.subTags) : t.value
@@ -73,11 +77,7 @@ export function encode(tags: TlvTag[]): string {
  * @param lowercase - Emit the checksum in lowercase (TrueMoney Slip Verify uses this)
  * @returns TLV string with the CRC tag appended
  */
-export function withCrcTag(
-  payload: string,
-  crcTagId: string,
-  lowercase = false,
-): string {
+export function withCrcTag(payload: string, crcTagId: string, lowercase = false): string {
   const body = payload + crcTagId.padStart(2, '0') + '04'
   return body + (lowercase ? crc16(body).toLowerCase() : crc16(body))
 }
@@ -90,11 +90,7 @@ export function withCrcTag(
  * @param subId - Optional sub-tag ID inside the found tag
  * @returns Matching tag, or `undefined` when absent
  */
-export function getTag(
-  tags: TlvTag[],
-  id: string,
-  subId?: string,
-): TlvTag | undefined {
+export function getTag(tags: TlvTag[], id: string, subId?: string): TlvTag | undefined {
   const tag = tags.find((t) => t.id === id)
   if (subId) return tag?.subTags?.find((s) => s.id === subId)
   return tag
@@ -108,5 +104,10 @@ export function getTag(
  * @returns TLV tag
  */
 export function tag(id: string, value: string): TlvTag {
+  if (value.length > 99) {
+    throw new RangeError(
+      `TLV value for tag ${id} exceeds the 2-digit length field (${value.length} > 99)`,
+    )
+  }
   return { id, value, length: value.length }
 }

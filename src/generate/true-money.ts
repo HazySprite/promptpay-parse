@@ -25,10 +25,7 @@ export function trueMoney({ mobileNo, amount, message }: TrueMoneyConfig): strin
   const payload = [
     tag('00', '01'),
     tag('01', amount ? '12' : '11'),
-    tag(
-      '29',
-      encode([tag('00', AID_PROMPTPAY), tag('03', `14000${mobileNo}`)]),
-    ),
+    tag('29', encode([tag('00', AID_PROMPTPAY), tag('03', `14000${mobileNo}`)])),
     tag('53', CURRENCY_THB),
     tag('58', COUNTRY_TH),
   ]

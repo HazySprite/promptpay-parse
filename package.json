@@ -1,7 +1,7 @@
 {
   "name": "promptpay-parse",
   "version": "1.0.2",
-  "description": "Zero-dependency TypeScript library for PromptPay & EMVCo QR Codes — parse, generate and validate. Works in Node.js, Next.js, Nuxt and browsers.",
+  "description": "Zero-dependency TypeScript library for PromptPay & EMVCo QR Codes — parse, generate and validate.",
   "author": "HazySprite",
   "license": "MIT",
   "keywords": [
@@ -58,12 +58,30 @@
         "default": "./dist/validate/index.js"
       }
     },
+    "./render": {
+      "import": {
+        "types": "./dist/render/index.d.mts",
+        "default": "./dist/render/index.mjs"
+      },
+      "require": {
+        "types": "./dist/render/index.d.ts",
+        "default": "./dist/render/index.js"
+      }
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "dist"
   ],
   "sideEffects": false,
+  "peerDependencies": {
+    "qrcode": ">=1.5.0"
+  },
+  "peerDependenciesMeta": {
+    "qrcode": {
+      "optional": true
+    }
+  },
   "engines": {
     "node": ">=18"
   },
@@ -71,13 +89,25 @@
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "lint": "prettier --check . && eslint .",
+    "format": "prettier --write . && eslint --fix .",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run typecheck && npm run build && npm test"
+    "prepublishOnly": "npm run typecheck && npm run lint && npm run build && npm test"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^24.0.0",
+    "@types/qrcode": "^1.5.6",
+    "@vitest/coverage-v8": "^5.0.2",
+    "eslint": "^10.11.0",
+    "eslint-config-prettier": "^10.1.8",
+    "fast-check": "^4.10.2",
+    "prettier": "^3.9.9",
+    "qrcode": "^1.5.4",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.0",
     "vitest": "^5.0.0"
   }
 }

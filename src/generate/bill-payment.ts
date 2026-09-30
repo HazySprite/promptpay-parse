@@ -23,13 +23,7 @@ export interface BillPaymentConfig {
  *
  * @returns QR Code payload
  */
-export function billPayment({
-  billerId,
-  amount,
-  ref1,
-  ref2,
-  ref3,
-}: BillPaymentConfig): string {
+export function billPayment({ billerId, amount, ref1, ref2, ref3 }: BillPaymentConfig): string {
   const tag30 = encode([
     tag('00', AID_BILL_PAYMENT),
     tag('01', billerId),

@@ -17,3 +17,21 @@ export function encodeTag81(message: string): string {
 
   return hex.toUpperCase()
 }
+
+/**
+ * Decode a Tag 81 personal message from uppercase/lowercase hex
+ * (one 4-digit group per UTF-16 code unit) back to a string.
+ *
+ * @param hex - Hex string as written by `encodeTag81`
+ * @returns Decoded message (empty string for malformed input)
+ */
+export function decodeTag81(hex: string): string {
+  if (!/^[0-9a-fA-F]*$/.test(hex) || hex.length % 4 !== 0) return ''
+
+  let message = ''
+  for (let i = 0; i < hex.length; i += 4) {
+    message += String.fromCharCode(Number.parseInt(hex.slice(i, i + 4), 16))
+  }
+
+  return message
+}

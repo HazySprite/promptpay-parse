@@ -27,6 +27,9 @@ export class BotBarcode {
 
     const parts = payload.slice(1).split('\r')
     if (parts.length < 4) return null
+    // Extra non-empty fields indicate a corrupted scan; dropping them
+    // would silently change what a payment system reads back.
+    if (parts.slice(4).some((p) => p.trim() !== '')) return null
 
     const billerId = parts[0]
     const ref1 = parts[1]
@@ -38,16 +41,9 @@ export class BotBarcode {
 
     const satang = Number.parseInt(amountField, 10)
     const amount =
-      amountField !== '0' && Number.isFinite(satang)
-        ? Number((satang / 100).toFixed(2))
-        : null
+      amountField !== '0' && Number.isFinite(satang) ? Number((satang / 100).toFixed(2)) : null
 
-    return new BotBarcode(
-      billerId,
-      ref1,
-      ref2.length > 0 ? ref2 : null,
-      amount,
-    )
+    return new BotBarcode(billerId, ref1, ref2.length > 0 ? ref2 : null, amount)
   }
 
   /**
@@ -57,8 +53,7 @@ export class BotBarcode {
    * `Math.round` to avoid floating-point artifacts (e.g. `30.10 * 100`).
    */
   toString(): string {
-    const amountField =
-      this.amount == null ? '0' : String(Math.round(this.amount * 100))
+    const amountField = this.amount == null ? '0' : String(Math.round(this.amount * 100))
     return `|${this.billerId}\r${this.ref1}\r${this.ref2 ?? ''}\r${amountField}`
   }
 

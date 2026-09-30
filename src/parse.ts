@@ -5,6 +5,15 @@ import { decode, type TlvTag } from './tlv'
 
 const TLV_HEADER = /^\d{4}/
 
+/** Options for `parse` */
+export interface ParseOptions {
+  /** Reject the payload when its trailing CRC checksum fails */
+  strict?: boolean
+
+  /** Decode nested TLV sub-tags (default `true`) */
+  subTags?: boolean
+}
+
 /**
  * Parse any EMVCo-compatible QR Code data string.
  *
@@ -12,16 +21,22 @@ const TLV_HEADER = /^\d{4}/
  * using a well-formedness heuristic.
  *
  * @param payload - QR Code data string from the scanner
- * @param strict - Reject the payload when its trailing CRC checksum fails
- * @param subTags - Decode nested TLV sub-tags (default `true`)
+ * @param strictOrOptions - `true` to reject payloads whose trailing CRC fails,
+ *   or an options object (`{ strict, subTags }`)
+ * @param subTags - Decode nested TLV sub-tags when using positional arguments (default `true`)
  * @returns Parsed QR instance, or `null` when the payload is not EMVCo data
  */
 export function parse(
   payload: string,
-  strict = false,
+  strictOrOptions: boolean | ParseOptions = false,
   subTags = true,
 ): EmvQr | null {
   if (typeof payload !== 'string' || !TLV_HEADER.test(payload)) return null
+
+  const strict =
+    typeof strictOrOptions === 'object' ? (strictOrOptions.strict ?? false) : strictOrOptions
+  const decodeSubTags =
+    typeof strictOrOptions === 'object' ? (strictOrOptions.subTags ?? true) : subTags
 
   if (strict) {
     const body = payload.slice(0, -4)
@@ -31,7 +46,7 @@ export function parse(
   const tags = decode(payload)
   if (tags.length === 0) return null
 
-  if (subTags) {
+  if (decodeSubTags) {
     for (const t of tags) {
       const sub = tryDecodeSubTags(t.value)
       if (sub) t.subTags = sub
@@ -60,9 +75,7 @@ function tryDecodeSubTags(value: string): TlvTag[] | undefined {
   if (!TLV_HEADER.test(value)) return undefined
 
   const sub = decode(value)
-  const wellFormed =
-    sub.length > 0 &&
-    sub.every((s) => s.length > 0 && s.length === s.value.length)
+  const wellFormed = sub.length > 0 && sub.every((s) => s.length > 0 && s.length === s.value.length)
 
   return wellFormed ? sub : undefined
 }

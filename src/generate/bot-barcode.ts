@@ -20,16 +20,6 @@ export interface BotBarcodeConfig {
  *
  * @returns Barcode payload
  */
-export function botBarcode({
-  billerId,
-  ref1,
-  ref2,
-  amount,
-}: BotBarcodeConfig): string {
-  return new BotBarcode(
-    billerId,
-    ref1,
-    ref2 ?? null,
-    amount ?? null,
-  ).toString()
+export function botBarcode({ billerId, ref1, ref2, amount }: BotBarcodeConfig): string {
+  return new BotBarcode(billerId, ref1, ref2 ?? null, amount ?? null).toString()
 }

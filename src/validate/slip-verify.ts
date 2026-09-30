@@ -17,10 +17,7 @@ export interface SlipVerifyData {
  *   of some bank apps (default `true`)
  * @returns Bank code and transaction reference, or `null` when invalid
  */
-export function slipVerify(
-  payload: string,
-  crcAutoFix = true,
-): SlipVerifyData | null {
+export function slipVerify(payload: string, crcAutoFix = true): SlipVerifyData | null {
   if (crcAutoFix) {
     const idx = payload.lastIndexOf('9104')
     if (idx !== -1) {

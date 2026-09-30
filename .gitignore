@@ -4,3 +4,11 @@ coverage/
 *.log
 .DS_Store
 .env
+
+# non-npm lockfiles (repo is npm-managed)
+bun.lock
+bun.lockb
+package-lock.json.bak
+
+# local asset workspace
+output/

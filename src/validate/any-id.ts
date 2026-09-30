@@ -1,6 +1,7 @@
 import { ProxyType, type ProxyTypeName } from '../generate/any-id'
 import { parse } from '../parse'
 import { AID_PROMPTPAY } from '../constants'
+import { extractAdditionalData, type AdditionalData } from '../additional-data'
 
 export interface AnyIdData {
   /** Proxy type detected from the sub-tag ID */
@@ -11,6 +12,9 @@ export interface AnyIdData {
 
   /** Transaction amount, present only when the QR carries Tag 54 */
   amount?: number
+
+  /** Additional data, present only when the QR carries Tag 62 */
+  additionalData?: AdditionalData
 }
 
 /**
@@ -26,9 +30,9 @@ export function anyId(payload: string): AnyIdData | null {
   if (qr.getTagValue('00') !== '01') return null
   if (qr.getTagValue('29', '00') !== AID_PROMPTPAY) return null
 
-  const entry = (
-    Object.entries(ProxyType) as [ProxyTypeName, string][]
-  ).find(([, id]) => qr.getTagValue('29', id) !== undefined)
+  const entry = (Object.entries(ProxyType) as [ProxyTypeName, string][]).find(
+    ([, id]) => qr.getTagValue('29', id) !== undefined,
+  )
   if (!entry) return null
 
   const [type, subId] = entry
@@ -40,10 +44,12 @@ export function anyId(payload: string): AnyIdData | null {
   }
 
   const amountRaw = qr.getTagValue('54')
+  const additionalData = extractAdditionalData(qr.getTags())
 
   return {
     type,
     target,
     ...(amountRaw !== undefined ? { amount: Number.parseFloat(amountRaw) } : {}),
+    ...(Object.keys(additionalData).length > 0 ? { additionalData } : {}),
   }
 }

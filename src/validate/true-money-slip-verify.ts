@@ -20,9 +20,7 @@ export interface TrueMoneySlipVerifyData {
  * @param payload - QR Code payload
  * @returns Transaction data, or `null` when the payload is invalid
  */
-export function trueMoneySlipVerify(
-  payload: string,
-): TrueMoneySlipVerifyData | null {
+export function trueMoneySlipVerify(payload: string): TrueMoneySlipVerifyData | null {
   const qr = parse(payload, true)
   if (!qr) return null
 

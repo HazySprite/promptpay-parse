@@ -1,4 +1,5 @@
 import { AID_PROMPTPAY, COUNTRY_TH, CURRENCY_THB } from '../constants'
+import { encodeAdditionalData, type AdditionalData } from '../additional-data'
 import { encode, tag, withCrcTag } from '../tlv'
 
 /** PromptPay AnyID proxy types — sub-tag IDs under Tag 29 */
@@ -27,6 +28,9 @@ export interface AnyIdConfig {
 
   /** Transaction amount (omit for a dynamic amount) */
   amount?: number
+
+  /** Additional data carried in Tag 62 (bill number, purpose, …) */
+  additionalData?: AdditionalData
 }
 
 /**
@@ -36,24 +40,23 @@ export interface AnyIdConfig {
  *
  * @returns QR Code payload
  */
-export function anyId({ type, target, amount }: AnyIdConfig): string {
+export function anyId({ type, target, amount, additionalData }: AnyIdConfig): string {
   const proxyValue =
-    type === 'MSISDN'
-      ? ('0000000000000' + target.replace(/^0/, '66')).slice(-13)
-      : target
+    type === 'MSISDN' ? ('0000000000000' + target.replace(/^0/, '66')).slice(-13) : target
 
   const payload = [
     tag('00', '01'),
     tag('01', amount ? '12' : '11'),
-    tag(
-      '29',
-      encode([tag('00', AID_PROMPTPAY), tag(ProxyType[type], proxyValue)]),
-    ),
+    tag('29', encode([tag('00', AID_PROMPTPAY), tag(ProxyType[type], proxyValue)])),
     tag('53', CURRENCY_THB),
     tag('58', COUNTRY_TH),
   ]
 
   if (amount) payload.push(tag('54', Number(amount).toFixed(2)))
+  if (additionalData) {
+    const encoded = encodeAdditionalData(additionalData)
+    if (encoded) payload.push(tag('62', encoded))
+  }
 
   return withCrcTag(encode(payload), '63')
 }
