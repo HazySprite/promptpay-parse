@@ -1,6 +1,6 @@
 {
   "name": "promptpay-parse",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Zero-dependency TypeScript library for PromptPay & EMVCo QR Codes — parse, generate and validate.",
   "author": "HazySprite",
   "license": "MIT",
